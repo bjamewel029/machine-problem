@@ -41,8 +41,8 @@ foreach ($events as [$t, $unit, $kind, $type]) { // go through events in time or
 $parent = []; // unit => its parent unit ('' means it is at the top)
 foreach (readCsv("$in/topology.csv") as 
 [$u , $site, $part]) { // each row: unit, site, parent
-    $parent[$u] = $part;
- // remeber who this unit's parent is 
+    $parent[$u] = $part; // remeber who this unit's parent is 
+    $siteOf[$u] = $site; // remeber which site this unit belongs to
 }
 
 $offline = [];
@@ -70,6 +70,13 @@ foreach ($alarms as $i => [$u, $kind, $s, $e]) { // go thru every alarm ($i is i
     $alarms[$i][] = $root; // store the root as the 5th item  of this alarm
 }
 
+$bySite = []; // site => list of [start, end] of its independent alarms
+foreach ($alarms as [$u, $kind, $s, $e, $root]) { // every alarm, now with its root as the 5th item
+    if ($root === $u) { // independent means its root is its own unit
+        $bySite[$siteOf[$u]][] = [$s, $e]; // file it under its site
+    }
+}
+
 // sort the alarms by start time,  then unit, then kind
 usort($alarms, fn($a, $b) => [$a[2], $a[0], $a[1]] <=> [$b[2], $b[0], $b[1]]);
 
@@ -82,3 +89,37 @@ foreach ($alarms as [$u, $kind, $s, $e, $root]) { // each alarm now has its root
    fwrite($fh, "$u,$kind,{$iso($s)},{$iso($e)},$root\n");   // write the real root instead of the placeholder
 }
 fclose($fh); //close the ouput file 
+
+
+
+// answer each query
+
+$fa = fopen("$out/answers.csv", 'w'); // open the answers file for writing
+fwrite($fa, "independent_count,peak_open\n"); // write the header line
+foreach (readCsv("$in/queries.csv") as [$siteId, $fromTs, $toTs]) { // one row per question
+    $from = strtotime($fromTs); // window start as a number (UTC Seconds)
+    $to = strtotime($toTs); // window end as a number
+    $count = 0; // how many alarms touch the window
+    $points = []; // list of [time, +1 or -1] for the peak calculation
+    
+    foreach ($bySite[$siteId] ?? [] as [$s, $e]) { //each independent alarm of this site 
+        if ($s < $to && $e > $from) { // does it overlap  the window? (start include, end excluded)
+        $count++; // yes, count it
+        $points[] = [max($s, $from), 1]; //it opens (cut to the window start)
+        $points[] = [min($e, $to), -1]; // it closes (cut to the window end)
+        }
+    }
+
+    usort($points, fn($a, $b) => [$a[0], $a[1]] <=> [$b[0], $b[1]]); // by time; at the same time, -1 comes before +1 
+    $cur = 0; // alarms open right now
+    $peak = 0; // highest values of $cur seen so far
+
+    foreach ($points as [$time, $delta]) { // walk thru the opens and closes in the time order 
+        $cur += $delta; // add 1 when opens, subtract 1 when one closes
+        if ($cur > $peak) $peak = $cur; // remmeber the highest
+    }
+
+    fwrite($fa, "$count,$peak\n"); // write this query's answer
+}
+
+fclose($fa); // close the answers file 
