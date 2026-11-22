@@ -1,0 +1,8 @@
+{
+  "folders": [{ "path": "." }],
+  "settings": {
+    "files.exclude": { "**/.git": true },
+    "editor.largeFileOptimizations": true,
+    "files.eol": "\n"
+  }
+}

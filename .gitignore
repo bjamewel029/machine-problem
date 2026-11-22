@@ -1,0 +1,7 @@
+# keep the big input out of your repository; keep your out/ folder in
+data/large/
+node_modules/
+__pycache__/
+target/
+bin/
+obj/

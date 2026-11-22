@@ -1,0 +1,7 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Check small (needs Python)", "type": "shell", "command": "python tools/check.py small", "problemMatcher": [] },
+    { "label": "Check medium (needs Python)", "type": "shell", "command": "python tools/check.py medium", "problemMatcher": [] }
+  ]
+}
