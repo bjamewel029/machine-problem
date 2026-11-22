@@ -38,6 +38,38 @@ foreach ($events as [$t, $unit, $kind, $type]) { // go through events in time or
     }
 }
 
+$parent = []; // unit => its parent unit ('' means it is at the top)
+foreach (readCsv("$in/topology.csv") as 
+[$u , $site, $part]) { // each row: unit, site, parent
+    $parent[$u] = $part;
+ // remeber who this unit's parent is 
+}
+
+$offline = [];
+// unit => list of [start, end] for its offline alarms
+foreach ($alarms as [$u, $kind, $s, $e]) { // look at every alarm
+    if ($kind === 'offline') { //only offline alarms can cause fallout 
+        $offline[$u][] = [$s, $e]; // add this time range to the unit's list
+    }
+}
+
+foreach ($alarms as $i => [$u, $kind, $s, $e]) { // go thru every alarm ($i is its position)
+    $root = $u; // assume independent: its own unit is the root 
+    $anc = $parent[$u] ?? ''; //start at the parent ('' if unknown or top)
+    while ($anc !== '') { // climb until we pass the top
+        foreach ($offline[$anc] ?? [] as [$os, $oe]) { //check each offline alarms of this ancestor
+            if($os <= $s && $s < $oe) {
+                // was it open when our alarm started? (start included, end excluded)
+                $root = $anc;
+                // yes: this anc is the root so far
+                break; // no need to check its other alarms 
+            }
+        }
+        $anc = $parent[$anc] ?? ''; //move one level up
+    }
+    $alarms[$i][] = $root; // store the root as the 5th item  of this alarm
+}
+
 // sort the alarms by start time,  then unit, then kind
 usort($alarms, fn($a, $b) => [$a[2], $a[0], $a[1]] <=> [$b[2], $b[0], $b[1]]);
 
@@ -46,7 +78,7 @@ $iso = fn(int $t) => gmdate('Y-m-d\TH:i:s\Z', $t);
 
 $fh =fopen("$out/alarms.csv", 'w'); // open the output file for writing 
 fwrite($fh, "unit_id,kind,start,end,root_unit\n"); // write the header line
-foreach ($alarms as [$unit, $kind, $s, $e]) { // for each alarm
-   fwrite($fh, "$unit,$kind,{$iso($s)},{$iso($e)},$unit\n");   // one row, no spaces around the commas
+foreach ($alarms as [$u, $kind, $s, $e, $root]) { // each alarm now has its root as the 5th item
+   fwrite($fh, "$u,$kind,{$iso($s)},{$iso($e)},$root\n");   // write the real root instead of the placeholder
 }
 fclose($fh); //close the ouput file 
