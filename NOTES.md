@@ -1,5 +1,16 @@
 # Notes
 
+## How to run
+Requires PHP 8.1 or later. From the project folder:
+
+    php solve.php small
+    php solve.php medium
+
+Output goes to `out/<dataset>/alarms.csv` and `out/<dataset>/answers.csv`.
+`small` and `medium` match the expected output exactly (`python tools/check.py medium`).
+`large` has not been run yet (see DECISIONS.md and NOTES.md).
+`tools/inspect.php` is a read-only script that profiles a dataset: `php tools/inspect.php large`.
+
 ## How I broke the problem down
 I read the spec and worked through the `small` example by hand (the tree and the alarm timeline). Then I built it in the order of the spec, checking each part against `expected/small` before moving on:
 1. Part A: turn the event log into alarms.
